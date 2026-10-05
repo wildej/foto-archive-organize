@@ -23,6 +23,21 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+## Windows
+
+В PowerShell:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+pip install -e .
+photoarchive plan --computer D:\Фото\Архив --google D:\Takeout --plan D:\Фото\plan.json
+photoarchive apply --plan D:\Фото\plan.json --output D:\Фото\Архив-чистый
+```
+
+Если активация скрипта запрещена политикой, для текущего окна достаточно `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, затем снова `.\.venv\Scripts\Activate.ps1`.
+
 Проверка на синтетических файлах:
 
 ```bash
@@ -115,7 +130,7 @@ photoarchive apply --plan plan.json --output ~/фотоархив
 
 ## Дубли
 
-Сравнение идёт только между снимками. Видео и WAV с фотографиями не склеиваются.
+Сравнение идёт по всем снимкам сразу: дубли внутри компьютерного архива, дубли внутри Takeout и совпадения между этими деревьями схлопываются одинаково. Видео и WAV с фотографиями не склеиваются.
 
 - Одинаковые байты или одинаковые пиксели схлопываются в один файл. Туда же попадает повторно сжатый JPEG того же размера, если средняя разница пикселей на уменьшенной копии не больше 12 (порог `MAD_SAME`): остаётся более тяжёлый файл.
 - Чистый ресайз — pHash очень близкий, пропорции те же, число пикселей заметно меньше. Остаётся большее число пикселей, при равенстве — более тяжёлый файл.

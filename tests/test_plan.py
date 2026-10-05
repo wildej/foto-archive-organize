@@ -36,6 +36,30 @@ def test_plan_json_has_no_review_gate(tmp_path: Path):
     assert plan["summary"]["edit_clusters"] == 0
 
 
+def test_duplicates_collapse_inside_each_tree_and_not_across_different_shots(tmp_path: Path):
+    """Две одинаковые JPEG только в компьютере и две другие только в Takeout."""
+    computer = tmp_path / "computer"
+    google_root = tmp_path / "google"
+    takeout = google_root / "Takeout" / "Google Photos"
+    computer_one = write_jpeg(computer / "Папка" / "a.jpg", size=(40, 40), seed=31, dto=DTO)
+    computer_copy = computer / "Копия" / "a-copy.jpg"
+    computer_copy.parent.mkdir(parents=True)
+    computer_copy.write_bytes(computer_one.read_bytes())
+    takeout_one = write_jpeg(takeout / "Альбом" / "g.jpg", size=(40, 40), seed=32, dto="2020:03:04 05:06:07")
+    takeout_copy = takeout / "Другой" / "g-copy.jpg"
+    takeout_copy.parent.mkdir(parents=True)
+    takeout_copy.write_bytes(takeout_one.read_bytes())
+    plan = build_plan(computer, google_root)
+    assert plan["summary"]["exact_dupes_collapsed"] == 2
+    assert len(_srcs(plan, "still")) == 2
+    assert len(plan["exact_groups"]) == 2
+    kept = {Path(src).name for src in _srcs(plan, "still")}
+    assert len(kept) == 2
+    dropped = {Path(path).name for group in plan["exact_groups"] for path in group["dropped"]}
+    assert kept.isdisjoint(dropped)
+    assert kept | dropped == {"a.jpg", "a-copy.jpg", "g.jpg", "g-copy.jpg"}
+
+
 def test_exact_duplicate_collapses(tmp_path: Path):
     root = tmp_path / "computer"
     original = write_jpeg(root / "Альбом" / "same.jpg", size=(48, 48), seed=3, dto=DTO)
