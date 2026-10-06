@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 import json
 import re
 from dataclasses import dataclass
@@ -194,6 +195,47 @@ def parse_filename_datetime(filename: str) -> datetime | None:
         return None
 
 
+def epoch_seconds(moment: datetime) -> float:
+    """Секунды Unix без системного mktime.
+
+    На Windows datetime.timestamp() для даты раньше 1970 бросает
+    OSError [Errno 22]. Наивная метка считается UTC.
+    """
+    if moment.tzinfo is None:
+        aware = moment.replace(tzinfo=timezone.utc)
+    else:
+        offset = moment.utcoffset() or timedelta(0)
+        aware = (moment - offset).replace(tzinfo=timezone.utc)
+    return calendar.timegm(
+        (aware.year, aware.month, aware.day, aware.hour, aware.minute, aware.second)
+    ) + aware.microsecond / 1_000_000
+
+
+def _platform_fromtimestamp(epoch: float, tz: timezone | None) -> datetime:
+    if tz is None:
+        return datetime.fromtimestamp(epoch)
+    return datetime.fromtimestamp(epoch, tz)
+
+
+def datetime_from_epoch(epoch: float, tz: timezone | None = None) -> datetime | None:
+    """Обратное к epoch_seconds. fromtimestamp на Windows тоже даёт Errno 22."""
+    try:
+        return _platform_fromtimestamp(epoch, tz)
+    except (OSError, OverflowError, ValueError):
+        try:
+            moment = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=float(epoch))
+        except OverflowError:
+            return None
+        if tz is None:
+            return moment.replace(tzinfo=None)
+        if tz is timezone.utc:
+            return moment
+        try:
+            return moment.astimezone(tz)
+        except (OSError, OverflowError, ValueError):
+            return moment
+
+
 def parse_photo_taken_timestamp(data: object) -> int | None:
     if not isinstance(data, dict):
         return None
@@ -229,8 +271,9 @@ def decide_taken(
         return Taken(dto, 1, "exif_datetime_original")
 
     if google_ts is not None:
-        instant = datetime.fromtimestamp(int(google_ts), timezone.utc)
-        return Taken(instant, 2, "google_photo_taken_time")
+        instant = datetime_from_epoch(int(google_ts), timezone.utc)
+        if instant is not None:
+            return Taken(instant, 2, "google_photo_taken_time")
 
     for source, rank, value_key, offset_key in (
         ("exif_datetime_digitized", 3, "dtd", "dtd_off"),
@@ -247,7 +290,9 @@ def decide_taken(
         return Taken(named, 5, "filename")
 
     if mtime_epoch is not None:
-        return Taken(datetime.fromtimestamp(mtime_epoch), 6, "mtime")
+        instant = datetime_from_epoch(mtime_epoch)
+        if instant is not None:
+            return Taken(instant, 6, "mtime")
     return Taken(None, 7, "none")
 
 

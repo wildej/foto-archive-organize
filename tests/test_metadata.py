@@ -1,17 +1,23 @@
+import calendar
 from datetime import datetime, timezone
 from pathlib import Path
 
+import photoarchive.metadata as metadata
+from photoarchive.cluster import _candidate_pairs
 from photoarchive.metadata import (
     album_from_computer_path,
     album_from_google_path,
     choose_album,
+    datetime_from_epoch,
     decide_taken,
+    epoch_seconds,
     folder_parts,
     is_edited_filename,
     metadata_marks_edited,
     normalize_stem,
     parse_filename_datetime,
 )
+from photoarchive.models import Item
 
 
 def test_filename_date_and_camera_names():
@@ -85,6 +91,61 @@ def test_albums_and_conflict():
     assert choice.name == "Италия"
     assert choice.conflict is True
     assert ("Отпуск", "computer") in choice.alternatives
+
+
+def _item(when: datetime, name: str) -> Item:
+    path = Path(name)
+    return Item(
+        kind="image",
+        path=path,
+        origin="computer",
+        sha256=name,
+        size=10,
+        mtime=0.0,
+        paths=[path],
+        stems=set(),
+        stem="",
+        width=8,
+        height=8,
+        phash=None,
+        pixel_hash=None,
+        taken_at=when,
+        taken_rank=1,
+        taken_source="exif_datetime_original",
+        explicit_edit=False,
+        albums=[],
+        sidecars=[],
+        ext=".jpg",
+    )
+
+
+def test_dates_before_1970_do_not_call_platform_timestamp(monkeypatch):
+    def reject_old(epoch, tz=None):
+        raise OSError(22, "Invalid argument")
+
+    monkeypatch.setattr(metadata, "_platform_fromtimestamp", reject_old)
+    old = datetime(1965, 6, 1, 12, 0, 0)
+    assert epoch_seconds(old) == calendar.timegm((1965, 6, 1, 12, 0, 0))
+    assert ".timestamp()" not in Path("src/photoarchive/cluster.py").read_text(encoding="utf-8")
+    taken = decide_taken(
+        {"dto": "1965:06:01 12:00:00", "dto_off": None, "dtd": None, "dtd_off": None, "dt": None, "dt_off": None},
+        None,
+        "scan.jpg",
+        None,
+    )
+    assert taken.at == old
+    assert folder_parts(taken) == ("1965", "06")
+    restored = datetime_from_epoch(epoch_seconds(old), timezone.utc)
+    assert restored == old.replace(tzinfo=timezone.utc)
+    mtime_taken = decide_taken(
+        {"dto": None, "dto_off": None, "dtd": None, "dtd_off": None, "dt": None, "dt_off": None},
+        None,
+        "scan.jpg",
+        epoch_seconds(old),
+    )
+    assert mtime_taken.at == old
+    pairs = _candidate_pairs([_item(old, "a.jpg"), _item(old, "b.jpg")])
+    assert (0, 1) in pairs
 
 
 def test_edited_names_and_metadata():

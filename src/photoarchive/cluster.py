@@ -16,7 +16,7 @@ from pathlib import Path
 from PIL import Image
 
 from photoarchive.classify import RAW_PREFERENCE, family_for_kind
-from photoarchive.metadata import Taken
+from photoarchive.metadata import Taken, epoch_seconds
 from photoarchive.models import Item, Media, Shot
 
 # Пороги подобраны по синтетическим кадрам: ресайз и повторное сжатие
@@ -312,7 +312,7 @@ def _candidate_pairs(items: list[Item]) -> set[tuple[int, int]]:
         for stem in item.stems:
             by_stem[stem].append(index)
         if item.taken_at is not None:
-            stamp = item.taken_at.timestamp()
+            stamp = epoch_seconds(item.taken_at)
             by_time[int(stamp // TIME_WINDOW_SEC)].append(index)
             # Окно в 2 секунды может пересечь границу корзины.
             by_time[int((stamp + TIME_WINDOW_SEC) // TIME_WINDOW_SEC)].append(index)
