@@ -189,7 +189,7 @@ def test_junk_skipped_and_default_album(tmp_path: Path):
     plan = build_plan(tmp_path / "computer")
     assert plan["summary"]["junk_skipped"] == 4
     assert plan["summary"]["unknown_skipped"] == 1
-    assert _dests(plan, "still") == ["2019/06/Разное/loose.jpg"]
+    assert _dests(plan, "still") == ["2019/06/loose.jpg"]
     assert not any(action["src"].endswith(".lnk") for action in plan["actions"])
 
 
@@ -258,4 +258,36 @@ def test_library_bucket_is_not_an_album(tmp_path: Path):
     root = tmp_path / "google" / "Google Photos" / "Photos from 2019"
     write_jpeg(root / "pic.jpg", size=(32, 32), seed=17, dto=DTO)
     plan = build_plan(google=tmp_path / "google")
-    assert _dests(plan, "still") == ["2019/06/Разное/pic.jpg"]
+    assert _dests(plan, "still") == ["2019/06/pic.jpg"]
+
+
+def test_russian_year_bucket_loses_to_computer_album(tmp_path: Path):
+    computer = tmp_path / "computer" / "Отпуск"
+    google = tmp_path / "google" / "Google Фото" / "Фото 2019 г"
+    write_jpeg(computer / "pic.jpg", size=(32, 32), seed=18, dto=DTO)
+    write_jpeg(google / "pic.jpg", size=(32, 32), seed=18, dto=DTO)
+    plan = build_plan(tmp_path / "computer", tmp_path / "google")
+    assert _dests(plan, "still") == ["2019/06/Отпуск/pic.jpg"]
+
+
+def test_lift_moves_year_bucket_up(tmp_path: Path):
+    from photoarchive.lift import lift_filler
+
+    month = tmp_path / "2011" / "10"
+    bucket = month / "Фото 2011 г"
+    (bucket / "Видео").mkdir(parents=True)
+    (bucket / "_source").mkdir()
+    (bucket / "a.jpg").write_bytes(b"jpeg")
+    (bucket / "Видео" / "a.mp4").write_bytes(b"mp4")
+    (bucket / "_source" / "a.NEF").write_bytes(b"nef")
+    (month / "Отпуск").mkdir()
+    (month / "Отпуск" / "b.jpg").write_bytes(b"keep")
+    (month / "a.jpg").write_bytes(b"jpeg")
+    report = lift_filler(tmp_path)
+    assert report.errors == []
+    assert (month / "Видео" / "a.mp4").read_bytes() == b"mp4"
+    assert (month / "_source" / "a.NEF").read_bytes() == b"nef"
+    assert (month / "a.jpg").read_bytes() == b"jpeg"
+    assert not bucket.exists()
+    assert (month / "Отпуск" / "b.jpg").read_bytes() == b"keep"
+    assert report.removed_dupes == 1

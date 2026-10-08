@@ -32,10 +32,12 @@ _MONTH_NAMES = {
 _LIBRARY = re.compile(
     r"^(?:"
     r"photos from \d{4}"
-    r"|фото из \d{4}"
-    r"|фото за \d{4}"
-    r"|фотографии из \d{4}"
-    r"|фотографии за \d{4}"
+    r"|фото из \d{4}(?:\s*г\.?)?"
+    r"|фото за \d{4}(?:\s*г\.?)?"
+    r"|фотографии из \d{4}(?:\s*г\.?)?"
+    r"|фотографии за \d{4}(?:\s*г\.?)?"
+    r"|фотографии \d{4}(?:\s*г\.?)?"
+    r"|фото \d{4}(?:\s*г\.?)?"
     r")$",
     re.IGNORECASE,
 )
@@ -83,6 +85,12 @@ def is_month_bucket(name: str) -> bool:
 def is_library_bucket(name: str) -> bool:
     text = name.strip()
     return bool(_LIBRARY.match(text) or is_year_bucket(text))
+
+
+def is_filler_album(name: str) -> bool:
+    """Годовой ящик Google и запасное «Разное» — не альбом, отдельную папку не заводят."""
+    text = name.strip()
+    return text.casefold() == DEFAULT_ALBUM.casefold() or is_library_bucket(text)
 
 
 def sanitize_folder(name: str) -> str:
@@ -327,7 +335,7 @@ def album_from_computer_path(path: Path, root: Path) -> str | None:
     if not parts:
         return None
     leaf = parts[-1]
-    if is_year_bucket(leaf) or is_month_bucket(leaf):
+    if is_year_bucket(leaf) or is_month_bucket(leaf) or is_library_bucket(leaf):
         return None
     return sanitize_folder(leaf)
 

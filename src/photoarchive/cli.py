@@ -10,6 +10,7 @@ from pathlib import Path
 from photoarchive import __version__
 from photoarchive.apply import apply_plan
 from photoarchive.convert import command_converter
+from photoarchive.lift import format_lift_report, lift_filler
 from photoarchive.plan import build_plan, load_plan, write_plan
 from photoarchive.summary import format_apply_report, format_summary
 
@@ -54,13 +55,19 @@ def _parser() -> argparse.ArgumentParser:
 
     summary = commands.add_parser("summary", help="Показать сводку уже записанного плана")
     summary.add_argument("--plan", type=Path, required=True)
+
+    lift = commands.add_parser(
+        "lift",
+        help="Убрать папки «Фото ГГГГ г» и «Разное» из уже собранного архива",
+    )
+    lift.add_argument("--root", type=Path, required=True, help="Корень собранного архива")
     return parser
 
 
 def _normalize(argv: list[str]) -> list[str]:
     if not argv or argv[0] in {"-h", "--help", "--version"}:
         return argv
-    if argv[0] not in {"plan", "apply", "summary"}:
+    if argv[0] not in {"plan", "apply", "summary", "lift"}:
         return ["plan", *argv]
     return argv
 
@@ -73,6 +80,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     args = parser.parse_args(argv)
     try:
+        if args.command == "lift":
+            print(format_lift_report(lift_filler(args.root)))
+            return 0
         if args.command == "summary":
             print(format_summary(load_plan(args.plan)))
             return 0

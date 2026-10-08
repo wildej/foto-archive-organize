@@ -87,6 +87,12 @@ def test_albums_and_conflict():
         google,
     )
     assert library is None
+    russian = album_from_google_path(
+        google / "Google Фото" / "Фото 2011 г" / "a.jpg",
+        google,
+    )
+    assert russian is None
+    assert album_from_computer_path(root / "Фото 2011 г" / "a.jpg", root) is None
     choice = choose_album([("Отпуск", "computer"), ("Италия", "google")])
     assert choice.name == "Италия"
     assert choice.conflict is True

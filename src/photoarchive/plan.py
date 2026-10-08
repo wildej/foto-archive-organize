@@ -10,6 +10,7 @@ from photoarchive.cluster import build_shots, preferred_raw
 from photoarchive.convert import detect_heic_converter, detect_raw_converter
 from photoarchive.metadata import (
     DEFAULT_ALBUM,
+    is_filler_album,
     SOURCE_DIRNAME,
     VIDEO_DIRNAME,
     Taken,
@@ -110,7 +111,7 @@ def build_plan(
         taken = shot_taken(shot)
         year, month = folder_parts(taken)
         album, _conflict = shot_album(shot)
-        base = f"{year}/{month}/{album}"
+        base = layout_base(year, month, album)
 
         if shot.raw_only:
             raw_only_count += 1
@@ -253,6 +254,12 @@ def build_plan(
     }
 
 
+def layout_base(year: str, month: str, album: str) -> str:
+    if is_filler_album(album):
+        return f"{year}/{month}"
+    return f"{year}/{month}/{album}"
+
+
 def _copy_action(item: Item, dest: str, role: str, date_source: str) -> dict:
     return {
         "op": "copy",
@@ -304,7 +311,7 @@ def _queue_motion(actions, conflicts, exact_groups, used, place, item: Item, rol
             }
         )
     dest = place(
-        f"{year}/{month}/{choice.name}/{VIDEO_DIRNAME}/{sanitize_filename(item.path.name)}"
+        f"{layout_base(year, month, choice.name)}/{VIDEO_DIRNAME}/{sanitize_filename(item.path.name)}"
     )
     action = _copy_action(item, dest, role, taken.source)
     if role == "video":
