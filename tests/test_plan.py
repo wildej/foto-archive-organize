@@ -172,6 +172,8 @@ def test_video_and_wav_go_to_video_folder(tmp_path: Path):
     jpeg_dest = _dests(plan, "still")[0]
     assert jpeg_dest == "2019/06/Поездка/pic.jpg"
     assert "/Видео/" not in jpeg_dest
+    assert all(action["op"] == "move" for action in plan["actions"] if action["role"] == "video")
+    assert all(action["op"] == "copy" for action in plan["actions"] if action["role"] == "audio")
     video_dests = _dests(plan, "video")
     assert any(dest == "2019/06/Поездка/Видео/VID_20190615_120000.mp4" for dest in video_dests)
     assert any(dest.endswith("/Видео/clip.MOV") for dest in video_dests)

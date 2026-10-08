@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from photoarchive.scan import sha256_file
 @dataclass
 class ApplyReport:
     copied: int = 0
+    moved: int = 0
     skipped: int = 0
     converted: int = 0
     conflicts: list[str] = field(default_factory=list)
@@ -48,6 +50,36 @@ def _safe_dest(output: Path, relative: str) -> Path:
     if not _is_inside(dest, output):
         raise ValueError(f"путь выходит за выходной каталог: {relative}")
     return dest
+
+
+def _move_into_archive(src: Path, dest: Path, expected: str | None, report: ApplyReport) -> None:
+    """Видео переносится. Уже скопированный ролик удаляется из исходной папки."""
+    if not src.is_file():
+        if dest.is_file():
+            report.skipped += 1
+            return
+        report.errors.append(f"нет исходного файла: {src}")
+        return
+    try:
+        if src.resolve() == dest.resolve():
+            report.skipped += 1
+            return
+    except OSError:
+        pass
+    current = sha256_file(src)
+    if expected and current != expected:
+        report.errors.append(f"исходный файл изменился с момента плана: {src}")
+        return
+    if dest.exists():
+        if sha256_file(dest) == current:
+            src.unlink()
+            report.moved += 1
+            return
+        report.conflicts.append(str(dest))
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dest))
+    report.moved += 1
 
 
 def _copy_bytes(src: Path, dest: Path) -> None:
@@ -108,6 +140,10 @@ def _apply_action(
     src = Path(action["src"])
     operation = action["op"]
     expected = action.get("sha256")
+
+    if operation == "move" or (operation == "copy" and action.get("role") == "video"):
+        _move_into_archive(src, dest, expected, report)
+        return
 
     if operation == "copy":
         if not src.is_file():

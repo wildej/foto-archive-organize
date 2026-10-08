@@ -83,6 +83,33 @@ def test_missing_raw_converter_still_copies_raw(tmp_path: Path):
         assert report.errors
 
 
+def test_video_is_moved_even_from_old_copy_plan(tmp_path: Path):
+    root = tmp_path / "computer" / "Поездка"
+    root.mkdir(parents=True)
+    source = root / "VID_20190615_120000.mp4"
+    source.write_bytes(b"video-bytes")
+    plan = build_plan(root.parent)
+    video = next(action for action in plan["actions"] if action["role"] == "video")
+    assert video["op"] == "move"
+    video["op"] = "copy"
+    output = tmp_path / "out"
+    first = apply_plan(plan, output)
+    dest = output / "2019" / "06" / "Поездка" / "Видео" / "VID_20190615_120000.mp4"
+    assert first.moved == 1
+    assert first.copied == 0
+    assert dest.read_bytes() == b"video-bytes"
+    assert not source.exists()
+    source.write_bytes(b"video-bytes")
+    placed = apply_plan(plan, output)
+    assert placed.moved == 1
+    assert not source.exists()
+    assert dest.read_bytes() == b"video-bytes"
+    third = apply_plan(plan, output)
+    assert third.moved == 0
+    assert third.skipped == 1
+    assert third.errors == []
+
+
 def test_output_inside_source_is_refused(tmp_path: Path):
     root = tmp_path / "computer"
     write_jpeg(root / "a.jpg", seed=1, dto="2019:01:02 03:04:05")

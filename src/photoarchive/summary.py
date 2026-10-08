@@ -20,7 +20,9 @@ def format_summary(plan: dict) -> str:
     ]
     lines = [f"{label}: {value}" for label, value in rows]
     lines.append("Политика: если в кадре есть оригинал и правка, копируется только правка.")
-    lines.append("Видео и WAV кладутся в подпапку «Видео», RAW и sidecar — в «_source».")
+    lines.append(
+        "Видео переносится в подпапку «Видео», WAV копируется туда же. RAW и sidecar — в «_source»."
+    )
     if plan.get("mode") == "dry-run":
         lines.append("Режим: сухой прогон. Исходники не менялись, копии не создавались.")
     warnings = plan.get("warnings") or []
@@ -33,6 +35,7 @@ def format_summary(plan: dict) -> str:
 def format_apply_report(report) -> str:
     lines = [
         f"Скопировано: {report.copied}",
+        f"Перенесено: {report.moved}",
         f"Уже было на месте: {report.skipped}",
         f"Сконвертировано: {report.converted}",
         f"Конфликтов путей: {len(report.conflicts)}",

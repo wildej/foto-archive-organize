@@ -306,7 +306,10 @@ def _queue_motion(actions, conflicts, exact_groups, used, place, item: Item, rol
     dest = place(
         f"{year}/{month}/{choice.name}/{VIDEO_DIRNAME}/{sanitize_filename(item.path.name)}"
     )
-    actions.append(_copy_action(item, dest, role, taken.source))
+    action = _copy_action(item, dest, role, taken.source)
+    if role == "video":
+        action["op"] = "move"
+    actions.append(action)
 
 
 def write_plan(plan: dict, path: Path) -> None:
